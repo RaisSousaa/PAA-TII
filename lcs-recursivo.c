@@ -108,6 +108,7 @@ int main(int argc, char **argv) {
         printf("Tempo de execucao (s): %.9f\n", t1 - t0);
         printf("Memoria dinamica (bytes): 0\n");
         printf("Resultado LCS: %d\n\n", lcs);
+        printf("---------------------------------------\n\n");
     }
 
     liberar_casos(casos, qtd);
