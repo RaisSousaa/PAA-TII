@@ -2,112 +2,89 @@
 #include <string.h>
 #include <windows.h>
 
-// Função de alta precisão para Windows
-static double agora_segundos(void)
+char *base_pilha;
+long pico_pilha;
+
+static double agora_ms(void)
 {
     static LARGE_INTEGER freq;
     static int init = 0;
     LARGE_INTEGER counter;
-
     if (!init)
     {
         QueryPerformanceFrequency(&freq);
         init = 1;
     }
     QueryPerformanceCounter(&counter);
-    return (double)counter.QuadPart / (double)freq.QuadPart;
+    return ((double)counter.QuadPart / (double)freq.QuadPart) * 1000.0;
 }
 
-// Função modular para encontrar o maior
-int encontrar_maior(int a, int b)
+int maior(int a, int b)
 {
     if (a > b)
-    {
         return a;
-    }
     else
-    {
         return b;
-    }
 }
 
-// --- VERSÃO RECURSIVA ---
-int lcs_recursivo(char *s1, char *s2, int m, int n)
+int lcs_rec(char *s1, char *s2, int m, int n)
 {
+    char local;
+    long uso = (long)(base_pilha - &local);
+    if (uso > pico_pilha)
+        pico_pilha = uso;
+
     if (m == 0 || n == 0)
-    {
         return 0;
-    }
     if (s1[m - 1] == s2[n - 1])
-    {
-        return 1 + lcs_recursivo(s1, s2, m - 1, n - 1);
-    }
+        return 1 + lcs_rec(s1, s2, m - 1, n - 1);
     else
-    {
-        return encontrar_maior(lcs_recursivo(s1, s2, m, n - 1),
-                               lcs_recursivo(s1, s2, m - 1, n));
-    }
+        return maior(lcs_rec(s1, s2, m, n - 1), lcs_rec(s1, s2, m - 1, n));
 }
 
-// --- VERSÃO ITERATIVA (Programação Dinâmica) ---
-int lcs_iterativo(char *s1, char *s2, int m, int n)
+int lcs_ite(char *s1, char *s2, int m, int n, unsigned long *mem)
 {
-    int matriz[m + 1][n + 1];
-    int i, j;
-
-    // Inicialização da borda de zeros (Ø)
-    for (i = 0; i <= m; i++)
+    int mt[m + 1][n + 1];
+    *mem = (unsigned long)(sizeof(int) * (m + 1) * (n + 1));
+    for (int i = 0; i <= m; i++)
     {
-        for (j = 0; j <= n; j++)
+        for (int j = 0; j <= n; j++)
         {
             if (i == 0 || j == 0)
-            {
-                matriz[i][j] = 0;
-            }
+                mt[i][j] = 0;
             else if (s1[i - 1] == s2[j - 1])
-            {
-                // Match: Diagonal + 1
-                matriz[i][j] = matriz[i - 1][j - 1] + 1;
-            }
+                mt[i][j] = mt[i - 1][j - 1] + 1;
             else
-            {
-                // Diferente: Maior entre Cima ou Esquerda
-                matriz[i][j] = encontrar_maior(matriz[i - 1][j], matriz[i][j - 1]);
-            }
+                mt[i][j] = maior(mt[i - 1][j], mt[i][j - 1]);
         }
     }
-    return matriz[m][n];
+    return mt[m][n];
 }
 
-void comparar_metodos(char *nome, char *s1, char *s2)
+void rodar(char *label, char *s1, char *s2)
 {
-    int m = (int)strlen(s1);
-    int n = (int)strlen(s2);
-    double inicio, fim;
-    int res_rec, res_ite;
+    int m = strlen(s1), n = strlen(s2);
+    unsigned long m_it;
+    char b;
+    base_pilha = &b;
+    pico_pilha = 0;
 
-    printf(">>> TESTE: %s\n", nome);
+    double t1 = agora_ms();
+    int r1 = lcs_rec(s1, s2, m, n);
+    double t2 = agora_ms();
 
-    // Medindo Recursivo
-    inicio = agora_segundos();
-    res_rec = lcs_recursivo(s1, s2, m, n);
-    fim = agora_segundos();
-    printf("RECURSIVO: LCS = %d | Tempo: %.10f s\n", res_rec, fim - inicio);
+    double t3 = agora_ms();
+    int r2 = lcs_ite(s1, s2, m, n, &m_it);
+    double t4 = agora_ms();
 
-    // Medindo Iterativo
-    inicio = agora_segundos();
-    res_ite = lcs_iterativo(s1, s2, m, n);
-    fim = agora_segundos();
-    printf("ITERATIVO: LCS = %d | Tempo: %.10f s\n", res_ite, fim - inicio);
-
-    printf("--------------------------------------------------\n");
+    printf("[%s]\nRec: %d | %.4f ms | Pilha: %ld B\n", label, r1, t2 - t1, pico_pilha);
+    printf("Ite: %d | %.4f ms | Matriz: %lu B\n---\n", r2, t4 - t3, m_it);
 }
 
 int main()
 {
-    comparar_metodos("IGUAIS (8x8)", "ABCDEFGH", "ABCDEFGH");
-    comparar_metodos("SEM COMUM (8x8)", "AAAAAAAA", "BBBBBBBB");
-    comparar_metodos("ALTERNADO (8x8)", "ABABABAB", "BABAABAA");
-
+    rodar("IGUAIS", "ABCDEFGH", "ABCDEFGH");
+    rodar("SEM COMUM ", "AAAAAAAA", "BBBBBBBB");
+    rodar("ALTERNADO", "ABABABAB", "BABAABAA");
     return 0;
 }
